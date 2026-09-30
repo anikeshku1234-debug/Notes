@@ -1,0 +1,999 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notepad Cloud - Secure Note Taking</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.5);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(107, 114, 128, 0.8);
+    }
+    .note-card {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .note-card:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-200">
+
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-none"></div>
+
+  <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+          <i class="fa-solid fa-feather-pointed text-lg"></i>
+        </div>
+        <div>
+          <span class="font-bold text-xl tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">NoteVerse</span>
+          <span class="hidden sm:inline-block ml-1 text-xs text-slate-500 font-medium">Cloud</span>
+        </div>
+      </div>
+
+      <!-- Search Input -->
+      <div class="flex-1 max-w-md mx-2 relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+        <input 
+          id="search-input" 
+          type="text" 
+          placeholder="Search by title, tag, or content..." 
+          class="w-full pl-10 pr-9 py-2 rounded-xl text-sm bg-slate-100 dark:bg-slate-800/80 border border-transparent focus:border-blue-500 dark:focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition"
+        >
+        <button id="clear-search-btn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i class="fa-solid fa-circle-xmark text-xs"></i>
+        </button>
+      </div>
+
+      <!-- Action items: Dark toggle, User Profile & Auth -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Dark Mode Toggle -->
+        <button id="theme-toggle" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+          <i class="fa-solid fa-moon dark:hidden"></i>
+          <i class="fa-solid fa-sun hidden dark:inline"></i>
+        </button>
+
+        <!-- User section -->
+        <div id="user-controls" class="flex items-center gap-2">
+          <!-- Auth buttons will be dynamically inserted here -->
+          <div class="h-6 w-20 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col md:flex-row gap-6">
+
+    <!-- Left Sidebar: Filters & Quick Actions -->
+    <aside class="w-full md:w-64 flex-shrink-0 flex flex-col gap-5">
+      <!-- Create Note Trigger Button -->
+      <button id="btn-open-create-modal" class="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition">
+        <i class="fa-solid fa-plus text-sm"></i>
+        <span>Create New Note</span>
+      </button>
+
+      <!-- Category Filter List -->
+      <div class="bg-white dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-1">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 px-3 py-1">Filters</span>
+        <button class="filter-tab active flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30" data-filter="all">
+          <span class="flex items-center gap-2.5">
+            <i class="fa-solid fa-layer-group w-4 text-center"></i> All Notes
+          </span>
+          <span id="count-all" class="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-800/50">0</span>
+        </button>
+        <button class="filter-tab flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50" data-filter="pinned">
+          <span class="flex items-center gap-2.5">
+            <i class="fa-solid fa-thumbtack text-amber-500 w-4 text-center"></i> Pinned
+          </span>
+          <span id="count-pinned" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700">0</span>
+        </button>
+
+        <div class="h-px bg-slate-200 dark:bg-slate-700/60 my-2"></div>
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 px-3 py-1">Categories</span>
+        
+        <button class="filter-tab flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50" data-filter="Personal">
+          <span class="flex items-center gap-2.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Personal
+          </span>
+          <span id="count-Personal" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700">0</span>
+        </button>
+        <button class="filter-tab flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50" data-filter="Work">
+          <span class="flex items-center gap-2.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span> Work
+          </span>
+          <span id="count-Work" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700">0</span>
+        </button>
+        <button class="filter-tab flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50" data-filter="Ideas">
+          <span class="flex items-center gap-2.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Ideas
+          </span>
+          <span id="count-Ideas" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700">0</span>
+        </button>
+        <button class="filter-tab flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50" data-filter="Study">
+          <span class="flex items-center gap-2.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Study
+          </span>
+          <span id="count-Study" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700">0</span>
+        </button>
+      </div>
+
+      <!-- Cloud Sync Info Pill -->
+      <div id="sync-status" class="bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-900/40 rounded-xl p-3 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2.5">
+        <i class="fa-solid fa-cloud-arrow-up text-blue-500"></i>
+        <div class="flex-1">
+          <div class="font-semibold">Cloud Connected</div>
+          <div class="text-[11px] text-blue-600/80 dark:text-blue-400/80" id="sync-text">Changes sync automatically</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right Area: Notes Display Grid -->
+    <section class="flex-1 flex flex-col min-w-0">
+      <!-- Section header with sorting & total display -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-baseline gap-2">
+          <h1 id="view-title" class="text-xl font-bold tracking-tight text-slate-800 dark:text-white">All Notes</h1>
+          <span id="current-notes-count" class="text-xs text-slate-500 dark:text-slate-400 font-medium"></span>
+        </div>
+        
+        <!-- Sort Control -->
+        <div class="flex items-center gap-2 text-xs">
+          <label class="text-slate-500 dark:text-slate-400 font-medium" for="sort-select">Sort:</label>
+          <select id="sort-select" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 text-xs cursor-pointer">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="az">Title (A-Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Notes Grid -->
+      <div id="notes-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-12">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Loading State Skeleton -->
+      <div id="notes-loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="h-44 rounded-2xl bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
+        <div class="h-44 rounded-2xl bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
+        <div class="h-44 rounded-2xl bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="hidden flex-col items-center justify-center py-20 text-center px-4">
+        <div class="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3 text-slate-400">
+          <i class="fa-regular fa-note-sticky text-2xl"></i>
+        </div>
+        <h3 class="text-base font-semibold text-slate-700 dark:text-slate-200">No notes found</h3>
+        <p class="text-sm text-slate-500 dark:text-slate-400 max-w-sm mt-1">Get started by creating your first note or change your current search & category filter.</p>
+        <button id="btn-empty-create" class="mt-4 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition shadow">
+          Create a note
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <div id="note-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200">
+    <div class="bg-white dark:bg-slate-800 w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col transform transition-transform scale-95 duration-200 max-h-[90vh]">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700/60">
+        <h2 id="modal-heading" class="font-bold text-lg text-slate-800 dark:text-slate-100">Create New Note</h2>
+        <button id="modal-close-btn" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <form id="note-form" class="p-6 flex flex-col gap-4 overflow-y-auto">
+        <input type="hidden" id="note-id" value="">
+
+        <!-- Title -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5" for="note-title">Title</label>
+          <input 
+            type="text" 
+            id="note-title" 
+            required 
+            placeholder="Meeting points, Trip Ideas, Grocery..." 
+            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm"
+          >
+        </div>
+
+        <!-- Category & Color row -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5" for="note-category">Category</label>
+            <select id="note-category" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm cursor-pointer">
+              <option value="Personal">Personal</option>
+              <option value="Work">Work</option>
+              <option value="Ideas">Ideas</option>
+              <option value="Study">Study</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Accent Color</label>
+            <div class="flex items-center gap-2 pt-1" id="color-palette">
+              <label class="cursor-pointer">
+                <input type="radio" name="note-color" value="default" class="sr-only peer" checked>
+                <div class="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-transparent peer-checked:border-blue-600 peer-checked:scale-110 transition"></div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="note-color" value="amber" class="sr-only peer">
+                <div class="w-7 h-7 rounded-full bg-amber-200 dark:bg-amber-900/60 border-2 border-transparent peer-checked:border-amber-600 peer-checked:scale-110 transition"></div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="note-color" value="emerald" class="sr-only peer">
+                <div class="w-7 h-7 rounded-full bg-emerald-200 dark:bg-emerald-900/60 border-2 border-transparent peer-checked:border-emerald-600 peer-checked:scale-110 transition"></div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="note-color" value="rose" class="sr-only peer">
+                <div class="w-7 h-7 rounded-full bg-rose-200 dark:bg-rose-900/60 border-2 border-transparent peer-checked:border-rose-600 peer-checked:scale-110 transition"></div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="note-color" value="purple" class="sr-only peer">
+                <div class="w-7 h-7 rounded-full bg-purple-200 dark:bg-purple-900/60 border-2 border-transparent peer-checked:border-purple-600 peer-checked:scale-110 transition"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Note Content -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5" for="note-content">Note Content</label>
+          <textarea 
+            id="note-content" 
+            rows="6" 
+            required 
+            placeholder="Write your thoughts, checklists, or reminders here..." 
+            class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm leading-relaxed"
+          ></textarea>
+        </div>
+
+        <!-- Pinned Checkbox -->
+        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" id="note-pinned" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 dark:bg-slate-900 dark:border-slate-700">
+          <span class="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-thumbtack text-amber-500 text-xs"></i> Pin this note to top
+          </span>
+        </label>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+          <button type="button" id="modal-cancel-btn" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+            Cancel
+          </button>
+          <button type="submit" id="save-note-btn" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20 active:scale-[0.98] transition">
+            Save Note
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200">
+    <div class="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden transform transition-transform scale-95 duration-200">
+      
+      <!-- Modal Header -->
+      <div class="p-6 pb-2 text-center relative">
+        <button id="auth-close-btn" class="absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3">
+          <i class="fa-solid fa-user-lock text-xl"></i>
+        </div>
+        <h3 id="auth-modal-title" class="text-xl font-bold text-slate-800 dark:text-slate-100">Welcome Back</h3>
+        <p id="auth-modal-subtitle" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Sign in to sync your notes everywhere</p>
+      </div>
+
+      <!-- Auth Form -->
+      <form id="auth-form" class="p-6 pt-3 flex flex-col gap-3.5">
+        <div id="auth-error-msg" class="hidden p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 text-xs"></div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1" for="auth-email">Email Address</label>
+          <input 
+            type="email" 
+            id="auth-email" 
+            required 
+            placeholder="you@example.com"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition"
+          >
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1" for="auth-password">Password</label>
+          <input 
+            type="password" 
+            id="auth-password" 
+            required 
+            minlength="6"
+            placeholder="••••••••" 
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition"
+          >
+        </div>
+
+        <button type="submit" id="auth-submit-btn" class="w-full mt-2 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/25 active:scale-[0.98] transition">
+          Sign In
+        </button>
+
+        <!-- Toggle between login & signup -->
+        <div class="text-center text-xs text-slate-500 dark:text-slate-400 pt-2">
+          <span id="auth-switch-prompt">Don't have an account?</span>
+          <button type="button" id="auth-switch-btn" class="ml-1 text-blue-600 dark:text-blue-400 font-semibold hover:underline">Sign up</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200">
+    <div class="bg-white dark:bg-slate-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-slate-200 dark:border-slate-700 transform transition-transform scale-95 duration-200 text-center">
+      <div class="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-500 mx-auto flex items-center justify-center mb-3">
+        <i class="fa-solid fa-trash-can text-lg"></i>
+      </div>
+      <h4 class="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Delete this note?</h4>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mb-5">This action cannot be undone. Are you sure you want to permanently remove it?</p>
+      <div class="flex items-center justify-center gap-3">
+        <button id="confirm-cancel-btn" class="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+          Cancel
+        </button>
+        <button id="confirm-proceed-btn" class="w-1/2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { 
+      getAuth, 
+      signInWithCustomToken, 
+      signInAnonymously, 
+      signInWithEmailAndPassword, 
+      createUserWithEmailAndPassword, 
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { 
+      getFirestore, 
+      collection, 
+      doc, 
+      setDoc, 
+      deleteDoc, 
+      onSnapshot 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'noteverse-app';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+      ? JSON.parse(__firebase_config) 
+      : {
+          apiKey: "demo-key",
+          authDomain: "demo.firebaseapp.com",
+          projectId: "demo-project",
+          storageBucket: "demo.appspot.com",
+          messagingSenderId: "123456789",
+          appId: "1:123456789:web:demo"
+        };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+    let allNotes = [];
+    let currentFilter = 'all'; // 'all', 'pinned', 'Personal', 'Work', 'Ideas', 'Study'
+    let searchQuery = '';
+    let sortMode = 'newest';
+    let unsubscribeNotes = null;
+    let authMode = 'login'; // 'login' or 'signup'
+    let pendingDeleteId = null;
+
+    /* Color styles mapping */
+    const COLOR_THEMES = {
+      default: 'bg-white dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80',
+      amber: 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40',
+      emerald: 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40',
+      rose: 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40',
+      purple: 'bg-purple-50/70 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900/40'
+    };
+
+    const CATEGORY_COLORS = {
+      Personal: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+      Work: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
+      Ideas: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+      Study: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
+    };
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      const icons = {
+        success: 'fa-circle-check text-emerald-500',
+        error: 'fa-circle-exclamation text-rose-500',
+        info: 'fa-circle-info text-blue-500'
+      };
+
+      toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl text-slate-800 dark:text-slate-100 text-sm transform transition-all duration-300 translate-y-2 opacity-0`;
+      toast.innerHTML = `
+        <i class="fa-solid ${icons[type] || icons.info} text-base flex-shrink-0"></i>
+        <span class="flex-1">${message}</span>
+      `;
+      
+      container.appendChild(toast);
+      
+      // Animate in
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      // Remove after 3.5s
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (prefersDark) {
+      document.documentElement.classList.add('dark');
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+    });
+
+    function openModal(modalEl) {
+      modalEl.classList.remove('hidden');
+      setTimeout(() => {
+        modalEl.classList.remove('opacity-0');
+        const box = modalEl.querySelector('div');
+        if (box) {
+          box.classList.remove('scale-95');
+          box.classList.add('scale-100');
+        }
+      }, 10);
+    }
+
+    function closeModal(modalEl) {
+      modalEl.classList.add('opacity-0');
+      const box = modalEl.querySelector('div');
+      if (box) {
+        box.classList.remove('scale-100');
+        box.classList.add('scale-95');
+      }
+      setTimeout(() => {
+        modalEl.classList.add('hidden');
+      }, 200);
+    }
+
+    async function initAuth() {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          // Anonymous login fallback to ensure instant ready state
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.warn("Auth initialization notice:", err);
+        try {
+          await signInAnonymously(auth);
+        } catch (anonErr) {
+          console.error("Anonymous fallback failed:", anonErr);
+        }
+      }
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      updateUserControls(user);
+      
+      if (user) {
+        subscribeToNotes(user.uid);
+      } else {
+        if (unsubscribeNotes) {
+          unsubscribeNotes();
+          unsubscribeNotes = null;
+        }
+        allNotes = [];
+        renderNotes();
+      }
+    });
+
+    function updateUserControls(user) {
+      const container = document.getElementById('user-controls');
+      if (!user || user.isAnonymous) {
+        container.innerHTML = `
+          <button id="btn-open-login" class="px-3.5 py-1.5 rounded-xl border border-blue-600/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-xs sm:text-sm font-semibold transition">
+            Sign In
+          </button>
+        `;
+        document.getElementById('btn-open-login').addEventListener('click', () => {
+          authMode = 'login';
+          updateAuthModalUI();
+          openModal(document.getElementById('auth-modal'));
+        });
+      } else {
+        const displayLabel = user.email ? user.email.split('@')[0] : 'User';
+        container.innerHTML = `
+          <div class="flex items-center gap-2">
+            <div class="hidden sm:flex flex-col text-right">
+              <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-tight">${displayLabel}</span>
+              <span class="text-[10px] text-slate-400 font-mono truncate max-w-[100px]">${user.email || user.uid}</span>
+            </div>
+            <button id="btn-logout" title="Sign out" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:text-slate-400 transition">
+              <i class="fa-solid fa-arrow-right-from-bracket text-sm"></i>
+            </button>
+          </div>
+        `;
+        document.getElementById('btn-logout').addEventListener('click', async () => {
+          try {
+            await signOut(auth);
+            showToast('Signed out successfully', 'info');
+            // Log back in anonymously so guest can continue saving notes
+            await signInAnonymously(auth);
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        });
+      }
+    }
+
+    const authModal = document.getElementById('auth-modal');
+    const authForm = document.getElementById('auth-form');
+    const authSwitchBtn = document.getElementById('auth-switch-btn');
+    const authErrorMsg = document.getElementById('auth-error-msg');
+
+    function updateAuthModalUI() {
+      const isLogin = authMode === 'login';
+      document.getElementById('auth-modal-title').textContent = isLogin ? 'Welcome Back' : 'Create an Account';
+      document.getElementById('auth-modal-subtitle').textContent = isLogin ? 'Sign in to access your cloud notes' : 'Store and organize notes securely in the cloud';
+      document.getElementById('auth-submit-btn').textContent = isLogin ? 'Sign In' : 'Create Account';
+      document.getElementById('auth-switch-prompt').textContent = isLogin ? "Don't have an account?" : 'Already have an account?';
+      authSwitchBtn.textContent = isLogin ? 'Sign up' : 'Sign in';
+      authErrorMsg.classList.add('hidden');
+      authForm.reset();
+    }
+
+    authSwitchBtn.addEventListener('click', () => {
+      authMode = authMode === 'login' ? 'signup' : 'login';
+      updateAuthModalUI();
+    });
+
+    document.getElementById('auth-close-btn').addEventListener('click', () => {
+      closeModal(authModal);
+    });
+
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+
+      authErrorMsg.classList.add('hidden');
+      const submitBtn = document.getElementById('auth-submit-btn');
+      const origText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Processing...';
+
+      try {
+        if (authMode === 'login') {
+          await signInWithEmailAndPassword(auth, email, password);
+          showToast('Welcome back!', 'success');
+        } else {
+          await createUserWithEmailAndPassword(auth, email, password);
+          showToast('Account created successfully!', 'success');
+        }
+        closeModal(authModal);
+      } catch (err) {
+        authErrorMsg.textContent = err.message.replace('Firebase: ', '');
+        authErrorMsg.classList.remove('hidden');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = origText;
+      }
+    });
+
+    function subscribeToNotes(userId) {
+      if (unsubscribeNotes) {
+        unsubscribeNotes();
+      }
+
+      const notesLoading = document.getElementById('notes-loading');
+      notesLoading.classList.remove('hidden');
+
+      // Rule 1: Private user path /artifacts/{appId}/users/{userId}/{collectionName}
+      // Rule 2: No complex queries or compound orderings - query the collection then sort in memory
+      const notesCollection = collection(db, 'artifacts', appId, 'users', userId, 'notes');
+
+      unsubscribeNotes = onSnapshot(
+        notesCollection,
+        (snapshot) => {
+          notesLoading.classList.add('hidden');
+          const notes = [];
+          snapshot.forEach((docSnapshot) => {
+            notes.push({
+              id: docSnapshot.id,
+              ...docSnapshot.data()
+            });
+          });
+          allNotes = notes;
+          renderNotes();
+          updateCounters();
+        },
+        (error) => {
+          notesLoading.classList.add('hidden');
+          console.error("Firestore listener error:", error);
+          showToast("Failed to sync notes: " + error.message, "error");
+        }
+      );
+    }
+
+    function updateCounters() {
+      const total = allNotes.length;
+      const pinned = allNotes.filter(n => n.pinned).length;
+      const personal = allNotes.filter(n => n.category === 'Personal').length;
+      const work = allNotes.filter(n => n.category === 'Work').length;
+      const ideas = allNotes.filter(n => n.category === 'Ideas').length;
+      const study = allNotes.filter(n => n.category === 'Study').length;
+
+      document.getElementById('count-all').textContent = total;
+      document.getElementById('count-pinned').textContent = pinned;
+      document.getElementById('count-Personal').textContent = personal;
+      document.getElementById('count-Work').textContent = work;
+      document.getElementById('count-Ideas').textContent = ideas;
+      document.getElementById('count-Study').textContent = study;
+    }
+
+    function renderNotes() {
+      const grid = document.getElementById('notes-grid');
+      const emptyState = document.getElementById('empty-state');
+      const notesCount = document.getElementById('current-notes-count');
+
+      // 1. Filter
+      let filtered = allNotes.filter(note => {
+        if (currentFilter === 'pinned' && !note.pinned) return false;
+        if (['Personal', 'Work', 'Ideas', 'Study'].includes(currentFilter) && note.category !== currentFilter) {
+          return false;
+        }
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = (note.title || '').toLowerCase().includes(q);
+          const matchContent = (note.content || '').toLowerCase().includes(q);
+          const matchCategory = (note.category || '').toLowerCase().includes(q);
+          return matchTitle || matchContent || matchCategory;
+        }
+        return true;
+      });
+
+      // 2. Sort in memory (Rule 2 adherence)
+      filtered.sort((a, b) => {
+        // Pinned notes always stick to the top
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+
+        if (sortMode === 'newest') {
+          return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+        } else if (sortMode === 'oldest') {
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        } else if (sortMode === 'az') {
+          return (a.title || '').localeCompare(b.title || '');
+        }
+        return 0;
+      });
+
+      notesCount.textContent = `${filtered.length} ${filtered.length === 1 ? 'note' : 'notes'}`;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      grid.innerHTML = filtered.map(note => {
+        const themeClass = COLOR_THEMES[note.color] || COLOR_THEMES.default;
+        const categoryBadgeClass = CATEGORY_COLORS[note.category] || 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
+        
+        const dateStr = note.updatedAt 
+          ? new Date(note.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : 'Just now';
+
+        // Escape HTML for safety
+        const safeTitle = escapeHtml(note.title || 'Untitled');
+        const safeContent = escapeHtml(note.content || '');
+
+        return `
+          <div class="note-card relative group rounded-2xl p-5 border ${themeClass} shadow-sm flex flex-col justify-between">
+            <div>
+              <!-- Note Top Bar: Category badge & Pin toggle -->
+              <div class="flex items-center justify-between gap-2 mb-2.5">
+                <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${categoryBadgeClass}">
+                  ${note.category || 'General'}
+                </span>
+                <div class="flex items-center gap-1">
+                  <button 
+                    onclick="window.togglePinNote('${note.id}', ${!note.pinned})" 
+                    title="${note.pinned ? 'Unpin' : 'Pin note'}"
+                    class="w-7 h-7 rounded-lg flex items-center justify-center transition ${note.pinned ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}"
+                  >
+                    <i class="fa-solid fa-thumbtack text-xs"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Note Title -->
+              <h3 class="font-bold text-base text-slate-800 dark:text-slate-100 leading-snug break-words mb-2">
+                ${safeTitle}
+              </h3>
+
+              <!-- Note Content Preview -->
+              <p class="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap break-words leading-relaxed line-clamp-6">
+                ${safeContent}
+              </p>
+            </div>
+
+            <!-- Footer: timestamp and edit/delete actions -->
+            <div class="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-700/50 flex items-center justify-between text-slate-400 text-xs">
+              <span class="text-[11px] text-slate-400">${dateStr}</span>
+              <div class="flex items-center gap-1 opacity-90 group-hover:opacity-100 transition">
+                <button 
+                  onclick="window.editNote('${note.id}')" 
+                  title="Edit note" 
+                  class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700/80 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                >
+                  <i class="fa-regular fa-pen-to-square text-xs"></i>
+                </button>
+                <button 
+                  onclick="window.promptDeleteNote('${note.id}')" 
+                  title="Delete note" 
+                  class="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                >
+                  <i class="fa-regular fa-trash-can text-xs"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    const noteModal = document.getElementById('note-modal');
+    const noteForm = document.getElementById('note-form');
+    const modalHeading = document.getElementById('modal-heading');
+
+    function resetNoteModal() {
+      document.getElementById('note-id').value = '';
+      document.getElementById('note-title').value = '';
+      document.getElementById('note-content').value = '';
+      document.getElementById('note-category').value = 'Personal';
+      document.getElementById('note-pinned').checked = false;
+      const defaultColorRadio = document.querySelector('input[name="note-color"][value="default"]');
+      if (defaultColorRadio) defaultColorRadio.checked = true;
+      modalHeading.textContent = 'Create New Note';
+    }
+
+    document.getElementById('btn-open-create-modal').addEventListener('click', () => {
+      resetNoteModal();
+      openModal(noteModal);
+      setTimeout(() => document.getElementById('note-title').focus(), 150);
+    });
+
+    document.getElementById('btn-empty-create').addEventListener('click', () => {
+      resetNoteModal();
+      openModal(noteModal);
+      setTimeout(() => document.getElementById('note-title').focus(), 150);
+    });
+
+    document.getElementById('modal-close-btn').addEventListener('click', () => closeModal(noteModal));
+    document.getElementById('modal-cancel-btn').addEventListener('click', () => closeModal(noteModal));
+
+    /* Edit Note Handler */
+    window.editNote = (id) => {
+      const note = allNotes.find(n => n.id === id);
+      if (!note) return;
+
+      document.getElementById('note-id').value = note.id;
+      document.getElementById('note-title').value = note.title || '';
+      document.getElementById('note-content').value = note.content || '';
+      document.getElementById('note-category').value = note.category || 'Personal';
+      document.getElementById('note-pinned').checked = !!note.pinned;
+
+      const color = note.color || 'default';
+      const colorRadio = document.querySelector(`input[name="note-color"][value="${color}"]`);
+      if (colorRadio) colorRadio.checked = true;
+
+      modalHeading.textContent = 'Edit Note';
+      openModal(noteModal);
+    };
+
+    /* Pin / Unpin Quick Toggle */
+    window.togglePinNote = async (id, pinned) => {
+      if (!auth.currentUser) return;
+      try {
+        const noteRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'notes', id);
+        await setDoc(noteRef, { pinned: pinned, updatedAt: Date.now() }, { merge: true });
+        showToast(pinned ? 'Note pinned to top' : 'Note unpinned', 'info');
+      } catch (err) {
+        showToast('Error updating pin: ' + err.message, 'error');
+      }
+    };
+
+    /* Save Note (Create or Update) */
+    noteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!auth.currentUser) {
+        showToast('Please sign in to save notes', 'error');
+        return;
+      }
+
+      const id = document.getElementById('note-id').value || crypto.randomUUID();
+      const title = document.getElementById('note-title').value.trim();
+      const content = document.getElementById('note-content').value.trim();
+      const category = document.getElementById('note-category').value;
+      const pinned = document.getElementById('note-pinned').checked;
+      const colorRadio = document.querySelector('input[name="note-color"]:checked');
+      const color = colorRadio ? colorRadio.value : 'default';
+
+      const saveBtn = document.getElementById('save-note-btn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      try {
+        const noteRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'notes', id);
+        const existingNote = allNotes.find(n => n.id === id);
+
+        const notePayload = {
+          title,
+          content,
+          category,
+          pinned,
+          color,
+          updatedAt: Date.now(),
+          createdAt: existingNote ? (existingNote.createdAt || Date.now()) : Date.now()
+        };
+
+        await setDoc(noteRef, notePayload);
+        closeModal(noteModal);
+        showToast('Note saved to cloud!', 'success');
+      } catch (err) {
+        showToast('Failed to save note: ' + err.message, 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Note';
+      }
+    });
+
+    const confirmModal = document.getElementById('confirm-modal');
+    window.promptDeleteNote = (id) => {
+      pendingDeleteId = id;
+      openModal(confirmModal);
+    };
+
+    document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
+      pendingDeleteId = null;
+      closeModal(confirmModal);
+    });
+
+    document.getElementById('confirm-proceed-btn').addEventListener('click', async () => {
+      if (!pendingDeleteId || !auth.currentUser) return;
+      const deleteId = pendingDeleteId;
+      pendingDeleteId = null;
+      closeModal(confirmModal);
+
+      try {
+        const noteRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'notes', deleteId);
+        await deleteDoc(noteRef);
+        showToast('Note deleted', 'info');
+      } catch (err) {
+        showToast('Failed to delete: ' + err.message, 'error');
+      }
+    });
+
+    const searchInput = document.getElementById('search-input');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim();
+      if (searchQuery) {
+        clearSearchBtn.classList.remove('hidden');
+      } else {
+        clearSearchBtn.classList.add('hidden');
+      }
+      renderNotes();
+    });
+
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      searchQuery = '';
+      clearSearchBtn.classList.add('hidden');
+      renderNotes();
+    });
+
+    // Category / Status Filter Buttons
+    document.querySelectorAll('.filter-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-tab').forEach(b => {
+          b.classList.remove('active', 'text-blue-600', 'dark:text-blue-400', 'bg-blue-50', 'dark:bg-blue-900/30');
+          b.classList.add('text-slate-600', 'dark:text-slate-300');
+        });
+
+        btn.classList.add('active', 'text-blue-600', 'dark:text-blue-400', 'bg-blue-50', 'dark:bg-blue-900/30');
+        btn.classList.remove('text-slate-600', 'dark:text-slate-300');
+
+        currentFilter = btn.getAttribute('data-filter');
+        const titles = {
+          all: 'All Notes',
+          pinned: 'Pinned Notes',
+          Personal: 'Personal Notes',
+          Work: 'Work Notes',
+          Ideas: 'Ideas & Brainstorming',
+          Study: 'Study Notes'
+        };
+        document.getElementById('view-title').textContent = titles[currentFilter] || 'Notes';
+        renderNotes();
+      });
+    });
+
+    // Sort Dropdown
+    document.getElementById('sort-select').addEventListener('change', (e) => {
+      sortMode = e.target.value;
+      renderNotes();
+    });
+
+    // Run auth initialization
+    initAuth();
+  </script>
+</body>
+</html>
+```
